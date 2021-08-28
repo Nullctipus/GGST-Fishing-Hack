@@ -12,18 +12,16 @@ namespace GGST_Fishing_Hack
 {
     class Program
     {
-        [DllImport("kernel32.dll")]
-        static extern bool VirtualProtectEx(IntPtr hProcess, IntPtr lpAddress, UIntPtr dwSize, uint flNewProtect, out uint lpflOldProtect);
-
-        [DllImport("kernel32.dll", SetLastError = true)]
-        static extern bool WriteProcessMemory(IntPtr hProcess, IntPtr lpBaseAddress, byte[] lpBuffer, uint nSize, out int lpNumberOfBytesWritten);
+        
 
         const string ProcessName = "GGST-Win64-Shipping";
 
         //Nops money being taken
+        const string UnlimitedPullsOffset = "GGST-Win64-Shipping.exe+0xB94709";
         static byte[] UnlimitedPulls = { 0x44, 0x89, 0x81, 0x24, 0x35, 0x03, 0x00 }; // mov [rcx+00033524],r8d
 
         //Skips some jumps checking rare fish
+        const string ForceFishOffset = "GGST-Win64-Shipping.exe+0xC3E9C5";
         static byte[] ForceFish = { 0x75, 0x76, 0x80, 0xFA, 0x0A, 0x72, 0x71, }; // jne GGST-Win64-Shipping.exe+C3EA3D
                                                                                  // cmp dl,0A
                                                                                  // jb GGST-Win64-Shipping.exe+C3EA3D
@@ -66,14 +64,31 @@ namespace GGST_Fishing_Hack
             }
             return r + bytes[bytes.Length - 1].ToString("X2");
         }
+        static bool BytesEqual(byte[] a, byte[] b)
+        {
+            if (a.Length == b.Length)
+            {
+                for(int i = 0;i< a.Length; i++)
+                {
+                    if(a[i] != b[i])
+                    {
+                        return false;
+                    }
+                }
+                return true;
+            }
+            return false;
+        }
         static async Task Main(string[] args)
         {
             Stopwatch s = new Stopwatch();
             s.Start();
             TitleText();
-            Console.WriteLine("Made For 1.09\n");
+            Console.WriteLine("Made For 1.09. It might work on other versions but will take longer\n");
             Console.WriteLine("This is not persistant between launches\n");
             Console.WriteLine("Waiting for Game");
+
+            byte[] nops = new byte[] { 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 };
 
             int PID = 0;
             Mem mem = new Mem();
@@ -83,27 +98,44 @@ namespace GGST_Fishing_Hack
                 PID = mem.GetProcIdFromName(ProcessName);
                 Thread.Sleep(100);
             }
-            Console.WriteLine("Process ID is " + PID);
+            Console.WriteLine("Process ID is " + PID+"\n");
             mem.OpenProcess(PID);
-            IEnumerable<long> UP = await mem.AoBScan(BytesToString(UnlimitedPulls), true, true);
-            if (UP.Count() > 0)
+            if (BytesEqual(mem.ReadBytes(UnlimitedPullsOffset, 7), UnlimitedPulls))
             {
-                Console.WriteLine($"\nAOB Scan Found {UP.First()}");
-                mem.WriteBytes((UIntPtr)UP.First(), new byte[] { 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 });
+                Console.WriteLine($"Offset {UnlimitedPullsOffset} Was Correct");
+                mem.WriteBytes(UnlimitedPullsOffset, nops);
+                Console.WriteLine("UnlimitedPulls Patched in\n");
+            }
+            else 
+            { 
+                IEnumerable<long> UP = await mem.AoBScan(BytesToString(UnlimitedPulls), true, true);
+                if (UP.Count() > 0)
+                {
+                    Console.WriteLine($"AOB Scan Found {UP.First()}");
+                    mem.WriteBytes((UIntPtr)UP.First(), nops);
+                    Console.WriteLine("UnlimitedPulls Patched in\n");
+                }
+                else
+                    Console.WriteLine("UnlimitedPulls AOB Not Found");
+            }
+            if (BytesEqual(mem.ReadBytes(ForceFishOffset, 7), ForceFish))
+            {
+                Console.WriteLine($"Offset {ForceFishOffset} Was Correct");
+                mem.WriteBytes(ForceFishOffset, nops);
                 Console.WriteLine("UnlimitedPulls Patched in");
             }
             else
-                Console.WriteLine("\nUnlimitedPulls AOB Not Found");
-
-            IEnumerable<long> FF = await mem.AoBScan(BytesToString(ForceFish), true, true);
-            if (FF.Count() > 0)
             {
-                Console.WriteLine($"AOB Scan Found {FF.First()}");
-                mem.WriteBytes((UIntPtr)FF.First(), new byte[] { 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 });
-                Console.WriteLine("ForceFish Patched in");
+                IEnumerable<long> FF = await mem.AoBScan(BytesToString(ForceFish), true, true);
+                if (FF.Count() > 0)
+                {
+                    Console.WriteLine($"AOB Scan Found {FF.First()}");
+                    mem.WriteBytes((UIntPtr)FF.First(), nops);
+                    Console.WriteLine("ForceFish Patched in");
+                }
+                else
+                    Console.WriteLine("ForceFish AOB Not Found");
             }
-            else
-                Console.WriteLine("ForceFish AOB Not Found");
             s.Stop();
             Console.WriteLine($"\nFinished Patching in {s.Elapsed.TotalSeconds}\n\nPress any key to exit");
             Console.ReadKey();
