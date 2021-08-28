@@ -7,4 +7,7 @@ Makes it so that Fishing costs nothing, and you get no rare fish
 Launch this and strive in any order
 
 ## Download
-TODO
+[GGST-Fishing-Hack.zip](https://github.com/BustR75/GGST-Fishing-Hack/releases/latest/download/GGST-Fishing-Hack.exe)
+
+## Credits 
+Learned how patching in c# works using [HAWGT/GGST-COLOR-UNLOCKER](https://github.com/HAWGT/GGST-COLOR-UNLOCKER)
